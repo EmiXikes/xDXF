@@ -483,6 +483,21 @@ namespace xDXF
             System.IO.File.WriteAllLines(FilePath, DXFData);
         }
 
+        public void Write_1_5(String FilePath)
+        {
+            List<string> DXFData = new List<string>();
+
+            foreach (var dataValPair in DataValPairs)
+            {
+                DXFData.Add(dataValPair.Code);
+                DXFData.Add(dataValPair.Value);
+            }
+
+            System.IO.File.WriteAllLines(FilePath, DXFData);
+
+
+        }
+
 
         public string FindByCode(string Code, List<ValPair> Data)
         {

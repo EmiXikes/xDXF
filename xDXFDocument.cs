@@ -32,8 +32,6 @@ namespace xDXF
 
     public class xDXFDocument
     {
-        // test changes....
-
         public string versionDescription = "Epic xDXF 0.4";
 
         public string[] RawData;
@@ -394,26 +392,19 @@ namespace xDXF
             Data = new Dictionary<string, Section>();
             DataStrings = new List<string>();
 
-            LineType lineType = LineType.Code;
             ValPair valPair = new ValPair();
 
-            Dictionary<string, Entity> TempEntityGroup = new Dictionary<string, Entity>();
-
-            Entity TempEntity = new Entity();
-            EntitySubClass TempSubClassEntity = new EntitySubClass();
+            int valPairIndex = 0;
 
             for (int LineIndex = 0; LineIndex < RawData.Count(); LineIndex += 2)
             {
-                string Code = RawData[LineIndex];
-                string Value = RawData[LineIndex + 1];
+                valPair.Code = RawData[LineIndex];
+                valPair.Value = RawData[LineIndex + 1];
 
+                DataStrings.Add(valPair.Code + " ||| " + valPair.Value);
+                DataValPairs.Add(new ValPair() { Code = valPair.Code, Value = valPair.Value, lineIndex = LineIndex });
 
-
-
-                    // After code and value are stored, perform additional sorting
-
-
-                
+                valPairIndex++;
             }
         }
 
@@ -484,6 +475,21 @@ namespace xDXF
         }
 
         public void Write_1_5(String FilePath)
+        {
+            List<string> DXFData = new List<string>();
+
+            foreach (var dataValPair in DataValPairs)
+            {
+                DXFData.Add(dataValPair.Code);
+                DXFData.Add(dataValPair.Value);
+            }
+
+            System.IO.File.WriteAllLines(FilePath, DXFData);
+
+
+        }
+
+        public void Write2(String FilePath)
         {
             List<string> DXFData = new List<string>();
 
@@ -800,6 +806,8 @@ namespace xDXF
     }
     public class ValPair
     {
+
+        public int lineIndex;
         public string Code;
         public string Value;
     }

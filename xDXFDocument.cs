@@ -85,10 +85,7 @@ namespace xDXF
         }
 
         #endregion
-
-
-
-        List<List<ValPair>> SubItems(List<ValPair> data, string subItemCode, string subItemValue = "")
+                List<List<ValPair>> SubItems(List<ValPair> data, string subItemCode, string subItemValue = "")
 
         {
             List<ValPair> SubR = new List<ValPair>();
@@ -121,14 +118,6 @@ namespace xDXF
             return R;
         }
 
-        private static Random random = new Random();
-        private static string RandomString(int length)
-        {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-            return new string(Enumerable.Repeat(chars, length)
-              .Select(s => s[random.Next(s.Length)]).ToArray());
-        }
-
 
         #endregion
 
@@ -139,7 +128,12 @@ namespace xDXF
             var Sections = SubItems(DataValPairs, "0", "SECTION");
             var Ents = Sections.FirstOrDefault(a => a.FirstOrDefault(x => x.Code.Trim() == "2").Value.Trim() == "ENTITIES");
 
+            var dxfVersion = xDXF.SubItemsFromData(xDXF.SubItemsFromData(DataValPairs, "0", "SECTION")[0], "9", "$ACADVER")[0][1].Value;
+
+
             var inserts = SubItems(Ents, "0", "INSERT");
+
+            // TODO Move attribute part to this method instead of the Type definition for Insert.
 
             foreach (var insert in inserts)
             {
@@ -152,7 +146,28 @@ namespace xDXF
             return R;
         }
 
+
+
+        public Dictionary<string, ValPair> HeaderVariables()
+        {
+
+            Dictionary<string, ValPair> Result = new Dictionary<string, ValPair>();
+
+            var Sections = xDXF.SubItemsFromData(DataValPairs, "0", "SECTION");
+
+            foreach (List<ValPair> I in xDXF.SubItemsFromData(Sections[0], "9"))
+            {
+                Result.Add(I[0].Value, I[1]);
+            }
+
+            return Result;
         }
+
+
+
+    }
+
+
 
 
     public class xInsert : Entity
@@ -172,10 +187,12 @@ namespace xDXF
             }
         }
 
-        public List<List <ValPair>> Attributes()
+        public List<List<ValPair>> Attributes()
         {
             return subItems("0", "ATTRIB");
         }
+
+        // TODO move attribute stuff to INSERTS method.
 
         public Dictionary<string, ValPair> AttributeValues()
         {
@@ -185,11 +202,12 @@ namespace xDXF
 
             foreach (List<ValPair> insert in attrtbutesFromInsert)
             {
+
                 var item_AcDbAttribute = xDXF.SubItemsFromData(insert, "100", "AcDbAttribute");
                 var item_AcDbText = xDXF.SubItemsFromData(insert, "100", "AcDbText");
 
                 Result.Add(
-                    item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value, 
+                    item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
                     item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1")
                     );
             }
@@ -198,13 +216,10 @@ namespace xDXF
         }
 
 
-        //public List< Entity> Attributes;
-        //public Dictionary<string, Entity> attributes;
-
-        //public Dictionary<string, ValPair> attributeValues;
-        //public Dictionary<string, ValPair> attributeValues1;
-
     }
+
+
+
 
 
 
@@ -300,6 +315,14 @@ namespace xDXF
 
 
     #region OLDSTUFF
+
+    //private static Random random = new Random();
+    //private static string RandomString(int length)
+    //{
+    //    const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    //    return new string(Enumerable.Repeat(chars, length)
+    //      .Select(s => s[random.Next(s.Length)]).ToArray());
+    //}
     //public enum LineType
     //{
     //    Code,

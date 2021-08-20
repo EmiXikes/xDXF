@@ -139,13 +139,48 @@ namespace xDXF
             {
                 var handle = insert.FirstOrDefault(h => h.Code.Trim() == "5").Value;
 
-                R.Add(handle, new xInsert { Data = insert });
+                handle = xDXF.SubItemsFromData(insert, "5")[0][0].Value;
+
+
+                var attrtbutesFromInsert = xDXF.SubItemsFromData(insert, "0", "ATTRIB");
+                Dictionary<string, ValPair> AttributeValues = new Dictionary<string, ValPair>();
+
+                foreach (List<ValPair> attr in attrtbutesFromInsert)
+                {
+                    var item_AcDbAttribute = xDXF.SubItemsFromData(attr, "100", "AcDbAttribute");
+                    var item_AcDbText = xDXF.SubItemsFromData(attr, "100", "AcDbText");
+
+                    if (Int32.Parse(dxfVersion.Substring(2)) > 1027)
+                    {
+                        // dxf version above 2013 (2018+)
+                        var attrValue2018 = xDXF.SubItemsFromData(attr, "101", "Embedded Object");
+                        if (attrValue2018[0].Count != 0)
+                        {
+                            // SingleLine attributes
+                            AttributeValues.Add(
+                                item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
+                                attrValue2018[0].FirstOrDefault(c => c.Code.Trim() == "1"));
+                        }
+                        else
+                        {
+                            // MultiLine attributes
+                            AttributeValues.Add(
+                                item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
+                                item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1"));
+                        }
+                    }
+                    else
+                    {
+                        // dxf version up to 2013
+                        AttributeValues.Add(
+                                item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
+                                item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1"));
+                    }
+                }
+                R.Add(handle, new xInsert { Data = insert , AttributeValues = AttributeValues });
             }
-
-
             return R;
         }
-
 
 
         public Dictionary<string, ValPair> HeaderVariables()
@@ -192,27 +227,11 @@ namespace xDXF
             return subItems("0", "ATTRIB");
         }
 
-        // TODO move attribute stuff to INSERTS method.
+        public Dictionary<string, ValPair> AttributeValues;
 
-        public Dictionary<string, ValPair> AttributeValues()
+        public xInsert()
         {
-            var attrtbutesFromInsert = subItems("0", "ATTRIB");
-
-            Dictionary<string, ValPair> Result = new Dictionary<string, ValPair>();
-
-            foreach (List<ValPair> insert in attrtbutesFromInsert)
-            {
-
-                var item_AcDbAttribute = xDXF.SubItemsFromData(insert, "100", "AcDbAttribute");
-                var item_AcDbText = xDXF.SubItemsFromData(insert, "100", "AcDbText");
-
-                Result.Add(
-                    item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
-                    item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1")
-                    );
-            }
-
-            return Result;
+            AttributeValues = new Dictionary<string, ValPair>();
         }
 
 

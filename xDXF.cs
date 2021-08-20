@@ -36,7 +36,12 @@ namespace xDXF
 
             }
 
-            R.Add(SubR);
+
+            if (SubR.Count != 0)
+            {
+                R.Add(SubR);
+            }
+            
 
             return R;
         }

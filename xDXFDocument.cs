@@ -129,59 +129,60 @@ namespace xDXF
             var Ents = Sections.FirstOrDefault(a => a.FirstOrDefault(x => x.Code.Trim() == "2").Value.Trim() == "ENTITIES");
 
             var dxfVersion = xDXF.SubItemsFromData(xDXF.SubItemsFromData(DataValPairs, "0", "SECTION")[0], "9", "$ACADVER")[0][1].Value;
-
-
             var inserts = SubItems(Ents, "0", "INSERT");
 
-            // TODO Move attribute part to this method instead of the Type definition for Insert.
 
             foreach (var insert in inserts)
             {
                 var handle = insert.FirstOrDefault(h => h.Code.Trim() == "5").Value;
-
                 handle = xDXF.SubItemsFromData(insert, "5")[0][0].Value;
 
+                var attrtbutesInInsert = xDXF.SubItemsFromData(insert, "0", "ATTRIB");
 
-                var attrtbutesFromInsert = xDXF.SubItemsFromData(insert, "0", "ATTRIB");
                 Dictionary<string, ValPair> AttributeValues = new Dictionary<string, ValPair>();
 
-                foreach (List<ValPair> attr in attrtbutesFromInsert)
+                if (attrtbutesInInsert.Count != 0)
                 {
-                    var item_AcDbAttribute = xDXF.SubItemsFromData(attr, "100", "AcDbAttribute");
-                    var item_AcDbText = xDXF.SubItemsFromData(attr, "100", "AcDbText");
 
-                    if (Int32.Parse(dxfVersion.Substring(2)) > 1027)
+                    foreach (List<ValPair> attr in attrtbutesInInsert)
                     {
-                        // dxf version above 2013 (2018+)
-                        var attrValue2018 = xDXF.SubItemsFromData(attr, "101", "Embedded Object");
-                        if (attrValue2018[0].Count != 0)
+                        var item_AcDbAttribute = xDXF.SubItemsFromData(attr, "100", "AcDbAttribute");
+                        var item_AcDbText = xDXF.SubItemsFromData(attr, "100", "AcDbText");
+
+                        if (Int32.Parse(dxfVersion.Substring(2)) > 1027)
                         {
-                            // SingleLine attributes
-                            AttributeValues.Add(
-                                item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
-                                attrValue2018[0].FirstOrDefault(c => c.Code.Trim() == "1"));
+                            // dxf version above 2013 (2018+)
+                            var item_embeddedObj = xDXF.SubItemsFromData(attr, "101", "Embedded Object");
+                            if (item_embeddedObj.Count != 0)
+                            {
+                                // MultiLine attributes
+                                AttributeValues.Add(
+                                    item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
+                                    item_embeddedObj[0].FirstOrDefault(c => c.Code.Trim() == "1"));
+                            }
+                            else
+                            {
+                                // SingleLine attributes
+                                AttributeValues.Add(
+                                    item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
+                                    item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1"));
+                            }
                         }
                         else
                         {
-                            // MultiLine attributes
+                            // dxf version up to 2013
                             AttributeValues.Add(
-                                item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
-                                item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1"));
+                                    item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
+                                    item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1"));
                         }
                     }
-                    else
-                    {
-                        // dxf version up to 2013
-                        AttributeValues.Add(
-                                item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
-                                item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1"));
-                    }
                 }
-                R.Add(handle, new xInsert { Data = insert , AttributeValues = AttributeValues });
+
+                // Dictionary<string, ValPair> AttributeValues = GetAttributeValues(dxfVersion, attrtbutesFromInsert);
+                R.Add(handle, new xInsert { Data = insert, _attributeValues = AttributeValues });
             }
             return R;
         }
-
 
         public Dictionary<string, ValPair> HeaderVariables()
         {
@@ -222,16 +223,18 @@ namespace xDXF
             }
         }
 
+        public Dictionary<string, ValPair> AttributeValues { get => _attributeValues;}
+
         public List<List<ValPair>> Attributes()
         {
             return subItems("0", "ATTRIB");
         }
 
-        public Dictionary<string, ValPair> AttributeValues;
+        public Dictionary<string, ValPair> _attributeValues;
 
         public xInsert()
         {
-            AttributeValues = new Dictionary<string, ValPair>();
+            _attributeValues = new Dictionary<string, ValPair>();
         }
 
 
@@ -273,7 +276,11 @@ namespace xDXF
 
             }
 
-            R.Add(SubR);
+            if (SubR.Count != 0)
+            {
+                R.Add(SubR);
+            }
+            
 
             return R;
         }

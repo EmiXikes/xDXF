@@ -6,11 +6,14 @@ using System.Threading.Tasks;
 
 namespace xDXF
 {
-    public static class xDXF
+
+    public class xDXF
+    { }
+    public class xDXFHelperMethods
     {
 
         #region Helper methods
-        public static List<List<ValPair>> SubItemsFromData(List<ValPair> data, string subItemCode, string subItemValue = "")
+        public static List<List<ValPair>> SubItems(List<ValPair> data, string subItemCode, string subItemValue = "")
         {
             List<ValPair> SubR = new List<ValPair>();
             List<List<ValPair>> R = new List<List<ValPair>>();

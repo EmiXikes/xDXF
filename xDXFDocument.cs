@@ -5,6 +5,8 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using static xDXF.xDXFHelperMethods;
+
 
 namespace xDXF
 {
@@ -34,14 +36,11 @@ namespace xDXF
     {
         public string versionDescription = "Epic xDXF 0.4";
         
-        //public Dictionary<string, Section> Data;
         public string[] RawData;
         public List<string> DataStrings;
         public List<ValPair> DataValPairs = new List<ValPair>();
 
-        int LineNo = 0;
-
-        #region Raw Operations
+        #region Basic IO
 
         #region Load File
 
@@ -85,39 +84,6 @@ namespace xDXF
         }
 
         #endregion
-                List<List<ValPair>> SubItems(List<ValPair> data, string subItemCode, string subItemValue = "")
-
-        {
-            List<ValPair> SubR = new List<ValPair>();
-            List<List<ValPair>> R = new List<List<ValPair>>();
-            bool matchFound = false;
-
-            foreach (var E in data)
-            {
-                if (E.Code.Trim() == subItemCode && (subItemValue.Trim() == E.Value.Trim() || subItemValue.Trim() == ""))
-                {
-                    matchFound = true;
-
-                    if (SubR.Count != 0)
-                    {
-                        R.Add(SubR);
-                    }
-                    SubR = new List<ValPair>();
-                }
-
-                if (matchFound == true)
-                {
-                    SubR.Add(E);
-                }
-                
-
-            }
-
-            R.Add(SubR);
-
-            return R;
-        }
-
 
         #endregion
 
@@ -128,31 +94,31 @@ namespace xDXF
             var Sections = SubItems(DataValPairs, "0", "SECTION");
             var Ents = Sections.FirstOrDefault(a => a.FirstOrDefault(x => x.Code.Trim() == "2").Value.Trim() == "ENTITIES");
 
-            var dxfVersion = xDXF.SubItemsFromData(xDXF.SubItemsFromData(DataValPairs, "0", "SECTION")[0], "9", "$ACADVER")[0][1].Value;
+            var dxfVersion = SubItems(SubItems(DataValPairs, "0", "SECTION")[0], "9", "$ACADVER")[0][1].Value;
             var inserts = SubItems(Ents, "0", "INSERT");
 
 
             foreach (var insert in inserts)
             {
                 var handle = insert.FirstOrDefault(h => h.Code.Trim() == "5").Value;
-                handle = xDXF.SubItemsFromData(insert, "5")[0][0].Value;
+                handle = SubItems(insert, "5")[0][0].Value;
 
-                var attrtbutesInInsert = xDXF.SubItemsFromData(insert, "0", "ATTRIB");
+                var AttrtbutesInInsert = SubItems(insert, "0", "ATTRIB");
 
                 Dictionary<string, ValPair> AttributeValues = new Dictionary<string, ValPair>();
 
-                if (attrtbutesInInsert.Count != 0)
+                if (AttrtbutesInInsert.Count != 0)
                 {
 
-                    foreach (List<ValPair> attr in attrtbutesInInsert)
+                    foreach (List<ValPair> attr in AttrtbutesInInsert)
                     {
-                        var item_AcDbAttribute = xDXF.SubItemsFromData(attr, "100", "AcDbAttribute");
-                        var item_AcDbText = xDXF.SubItemsFromData(attr, "100", "AcDbText");
+                        var item_AcDbAttribute = SubItems(attr, "100", "AcDbAttribute");
+                        var item_AcDbText = SubItems(attr, "100", "AcDbText");
 
                         if (Int32.Parse(dxfVersion.Substring(2)) > 1027)
                         {
                             // dxf version above 2013 (2018+)
-                            var item_embeddedObj = xDXF.SubItemsFromData(attr, "101", "Embedded Object");
+                            var item_embeddedObj = SubItems(attr, "101", "Embedded Object");
                             if (item_embeddedObj.Count != 0)
                             {
                                 // MultiLine attributes
@@ -178,7 +144,6 @@ namespace xDXF
                     }
                 }
 
-                // Dictionary<string, ValPair> AttributeValues = GetAttributeValues(dxfVersion, attrtbutesFromInsert);
                 R.Add(handle, new xInsert { Data = insert, _attributeValues = AttributeValues });
             }
             return R;
@@ -189,9 +154,9 @@ namespace xDXF
 
             Dictionary<string, ValPair> Result = new Dictionary<string, ValPair>();
 
-            var Sections = xDXF.SubItemsFromData(DataValPairs, "0", "SECTION");
+            var Sections = SubItems(DataValPairs, "0", "SECTION");
 
-            foreach (List<ValPair> I in xDXF.SubItemsFromData(Sections[0], "9"))
+            foreach (List<ValPair> I in SubItems(Sections[0], "9"))
             {
                 Result.Add(I[0].Value, I[1]);
             }
@@ -227,7 +192,7 @@ namespace xDXF
 
         public List<List<ValPair>> Attributes()
         {
-            return subItems("0", "ATTRIB");
+            return SubItems("0", "ATTRIB");
         }
 
         public Dictionary<string, ValPair> _attributeValues;
@@ -255,34 +220,10 @@ namespace xDXF
             Data = new List<ValPair>();
         }
 
-        public List<List<ValPair>> subItems(string subItemCode, string subItemValue = "")
+        public List<List<ValPair>> SubItems(string subItemCode, string subItemValue = "")
         {
-            List<ValPair> SubR = new List<ValPair>();
-            List<List<ValPair>> R = new List<List<ValPair>>();
-            bool start = false;
-            foreach (var E in Data)
-            {
-                if (E.Code.Trim() == subItemCode && (subItemValue.Trim() == E.Value.Trim() || subItemValue.Trim() == ""))
-                {
-                    if (SubR.Count != 0)
-                    {
-                        R.Add(SubR);
-                    }
-                    start = true;
-                    SubR = new List<ValPair>();
-                }
+            return xDXFHelperMethods.SubItems(Data, subItemCode, subItemValue);
 
-                if (start) { SubR.Add(E); }
-
-            }
-
-            if (SubR.Count != 0)
-            {
-                R.Add(SubR);
-            }
-            
-
-            return R;
         }
 
         public string ReadCode(string Code)
@@ -312,13 +253,6 @@ namespace xDXF
 
     public class Entity :EntityClass
     {
-        ////public List<EntitySubClass> SubClassItems;
-        ////public Dictionary<string, EntitySubClass> SubClassItems;
-        //public Entity()
-        //{
-        //    //SubClassItems = new List<EntitySubClass>();
-        //    //SubClassItems = new Dictionary<string, EntitySubClass>();
-        //}
 
     }
 
@@ -331,7 +265,6 @@ namespace xDXF
 
     public class ValPair
     {
-
         public int lineIndex;
         public string Code;
         public string Value;

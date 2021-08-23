@@ -164,6 +164,38 @@ namespace xDXF
             return Result;
         }
 
+        public Dictionary<string, List<ValPair>> Sections()
+        {
+            Dictionary<string, List<ValPair>> Result = new Dictionary<string, List<ValPair>>();
+
+            var S = SubItems(DataValPairs, "0", "SECTION");
+
+            foreach (var sect in S)
+            {
+                Result.Add(sect.FirstOrDefault(C => C.Code.Trim() == "2").Value, sect);
+            }
+
+            return Result;
+        }
+
+        public Dictionary<string, List<ValPair>> Layouts()
+        {
+            Dictionary<string, List<ValPair>> Result = new Dictionary<string, List<ValPair>>();
+
+            var lyts =  SubItems(DataValPairs, "0", "LAYOUT", true);
+
+            foreach (var lyt in lyts)
+            {
+
+                var AcDbLayout = SubItems(lyt, "100", "AcDbLayout", true);
+
+
+                Result.Add(AcDbLayout[0].FirstOrDefault(C => C.Code.Trim() == "1").Value, lyt);
+            }
+
+            return Result;
+        }
+
 
 
     }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -97,6 +98,7 @@ namespace xDXF
             var dxfVersion = SubItems(SubItems(DataValPairs, "0", "SECTION")[0], "9", "$ACADVER")[0][1].Value;
             var inserts = SubItems(Ents, "0", "INSERT");
 
+            
 
             foreach (var insert in inserts)
             {
@@ -125,6 +127,8 @@ namespace xDXF
                                 AttributeValues.Add(
                                     item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
                                     item_embeddedObj[0].FirstOrDefault(c => c.Code.Trim() == "1"));
+
+                                
                             }
                             else
                             {
@@ -144,7 +148,7 @@ namespace xDXF
                     }
                 }
 
-                R.Add(handle, new xInsert { Data = insert, _attributeValues = AttributeValues });
+                R.Add(handle, new xInsert { Data = insert, _a = AttributeValues });
             }
             return R;
         }
@@ -220,20 +224,141 @@ namespace xDXF
             }
         }
 
-        public Dictionary<string, ValPair> AttributeValues { get => _attributeValues;}
+        // TODO Name
+
+        // TODO Color
+        public string Layer
+        {
+            get 
+            {
+                var AcDbEntity = SubItems("100", "AcDbEntity")[0];
+                return AcDbEntity.FirstOrDefault(C => C.Code.Trim() == "8").Value; 
+            }
+            set
+            {
+                var AcDbEntity = SubItems("100", "AcDbEntity")[0];
+                AcDbEntity.FirstOrDefault(C => C.Code.Trim() == "8").Value = value;
+                //layerName = value;
+            }
+        }
+
+        // TODO LineType
+
+        // TODO Attributes not updated correctly when editing block Position, Scale or Rotation.
+        public Vector3 Postion
+        {
+            get
+            {
+                var AcDbBlockReference = SubItems("100", "AcDbBlockReference")[0];
+                postion.X = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "10").Value.Replace(".", ","));
+                postion.Y = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "20").Value.Replace(".", ","));
+                postion.Z = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "30").Value.Replace(".", ","));
+                return postion;
+            }
+            set
+            {
+                // TODO If block has attributes, their position is not updated correctly. ATTSYNC fixes it, but it's not ideal.
+                // This needs to be fixed, by changing attribute positions as well.
+                // New attribute positions need to be calculated with offset from data in block definition.
+                
+                var AcDbBlockReference = SubItems("100", "AcDbBlockReference")[0];
+                AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "10").Value = value.X.ToString().Replace(",", ".");
+                AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "20").Value = value.Y.ToString().Replace(",", ".");
+                AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "30").Value = value.Z.ToString().Replace(",", ".");
+
+                //postion = value;
+            }
+        }
+        public Vector3 Scale
+        {
+            get
+            {
+                var AcDbBlockReference = SubItems("100", "AcDbBlockReference")[0];
+                var scValPair = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41");
+
+                if (scValPair != null)
+                {
+                    scale.X = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41").Value.Replace(".", ","));
+                    scale.Y = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "42").Value.Replace(".", ","));
+                    scale.Z = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43").Value.Replace(".", ","));
+                } else
+                {
+                    scale.X = 1;
+                    scale.Y = 1;
+                    scale.Z = 1;
+                }
+                return scale;
+            }
+            set
+            {
+                var AcDbBlockReference = SubItems("100", "AcDbBlockReference")[0];
+                var scValPair = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41");
+                if (scValPair != null)
+                {
+                    AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41").Value = value.X.ToString().Replace(",", ".");
+                    AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "42").Value = value.Y.ToString().Replace(",", ".");
+                    AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43").Value = value.Z.ToString().Replace(",", ".");
+                }
+
+                  //  scale = value;
+            }
+        }
+        public float Rotation
+        {
+            get 
+            {
+                var AcDbBlockReference = SubItems("100", "AcDbBlockReference")[0];
+                var rotValpair = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "50");
+                string rot;
+                if (rotValpair != null)
+                {
+                    rot = rotValpair.Value.Replace(".", ",");
+                }
+                else
+                {
+                    rot = "0";
+                }
+                rotation = float.Parse(rot);
+                return rotation; 
+            }
+            set
+            {
+                // TODO If block has attributes, their rotation is not updated correctly. ATTSYNC fixes it, but it's not ideal.
+                // This needs to be fixed, by changing attribute rotation as well.
+                // New attribute rotation needs to be calculated with offset from data in block definition.
+                var AcDbBlockReference = SubItems("100", "AcDbBlockReference")[0];
+                var rotValpair = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "50");
+                if (rotValpair != null)
+                {
+                    rotValpair.Value = value.ToString();
+                }
+                else
+                {
+                    // TODO If original rotation was 0, the ValPair entry does not exist.
+                    // Need to add these lines to the file and test if it still works.
+                }
+            }
+        }
 
         public List<List<ValPair>> Attributes()
         {
             return SubItems("0", "ATTRIB");
         }
+        public Dictionary<string, ValPair> AttributeValues { get => _a;}
 
-        public Dictionary<string, ValPair> _attributeValues;
+        #region Constructor stuff and privates
 
         public xInsert()
         {
-            _attributeValues = new Dictionary<string, ValPair>();
+            _a = new Dictionary<string, ValPair>();
         }
 
+        public Dictionary<string, ValPair> _a;
+
+        private Vector3 scale;
+        private Vector3 postion;
+        private float rotation;
+        #endregion
 
     }
 
@@ -257,6 +382,9 @@ namespace xDXF
             return xDXFHelperMethods.SubItems(Data, subItemCode, subItemValue);
 
         }
+
+
+
 
         public string ReadCode(string Code)
         {

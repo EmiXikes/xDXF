@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -22,6 +24,7 @@ namespace xDXF
         public const string ATTRIBUTETAG = "2";
         public const string ATTRIBUTEVALUE = "1";
         public const string COLOR = "62";
+        public const string COLORRGB = "420";
         public const string LAYER = "8";
         public const string ROTATION = "50";
         public const string LOCATIONX = "10";
@@ -202,6 +205,7 @@ namespace xDXF
 
 
 
+
     }
 
 
@@ -226,25 +230,12 @@ namespace xDXF
 
         // TODO Name
 
-        // TODO Color
-        public string Layer
-        {
-            get 
-            {
-                var AcDbEntity = SubItems("100", "AcDbEntity")[0];
-                return AcDbEntity.FirstOrDefault(C => C.Code.Trim() == "8").Value; 
-            }
-            set
-            {
-                var AcDbEntity = SubItems("100", "AcDbEntity")[0];
-                AcDbEntity.FirstOrDefault(C => C.Code.Trim() == "8").Value = value;
-                //layerName = value;
-            }
-        }
 
         // TODO LineType
 
         // TODO Attributes not updated correctly when editing block Position, Scale or Rotation.
+
+        [Description("This is the description for SpaceKey")]
         public Vector3 Postion
         {
             get
@@ -260,7 +251,7 @@ namespace xDXF
                 // TODO If block has attributes, their position is not updated correctly. ATTSYNC fixes it, but it's not ideal.
                 // This needs to be fixed, by changing attribute positions as well.
                 // New attribute positions need to be calculated with offset from data in block definition.
-                
+
                 var AcDbBlockReference = SubItems("100", "AcDbBlockReference")[0];
                 AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "10").Value = value.X.ToString().Replace(",", ".");
                 AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "20").Value = value.Y.ToString().Replace(",", ".");
@@ -269,6 +260,11 @@ namespace xDXF
                 //postion = value;
             }
         }
+
+        /// <summary>
+        /// <para> Get or Set block Scale </para>
+        /// <para> Don't use on blocks with attributes. For now Block attributes are not updated correctly when writing back Position, Scale or Rotation. </para>
+        /// </summary>
         public Vector3 Scale
         {
             get
@@ -281,7 +277,8 @@ namespace xDXF
                     scale.X = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41").Value.Replace(".", ","));
                     scale.Y = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "42").Value.Replace(".", ","));
                     scale.Z = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43").Value.Replace(".", ","));
-                } else
+                }
+                else
                 {
                     scale.X = 1;
                     scale.Y = 1;
@@ -300,12 +297,12 @@ namespace xDXF
                     AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43").Value = value.Z.ToString().Replace(",", ".");
                 }
 
-                  //  scale = value;
+                //  scale = value;
             }
         }
         public float Rotation
         {
-            get 
+            get
             {
                 var AcDbBlockReference = SubItems("100", "AcDbBlockReference")[0];
                 var rotValpair = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "50");
@@ -319,7 +316,7 @@ namespace xDXF
                     rot = "0";
                 }
                 rotation = float.Parse(rot);
-                return rotation; 
+                return rotation;
             }
             set
             {
@@ -344,7 +341,7 @@ namespace xDXF
         {
             return SubItems("0", "ATTRIB");
         }
-        public Dictionary<string, ValPair> AttributeValues { get => _a;}
+        public Dictionary<string, ValPair> AttributeValues { get => _a; }
 
         #region Constructor stuff and privates
 
@@ -362,12 +359,99 @@ namespace xDXF
 
     }
 
-
-
-
-
-
     #region Strcture Items
+    public class Entity : EntityClass
+    {
+        // TODO Color
+
+        public string Color
+        {
+            get
+            {
+                var AcDbEntity = SubItems(CONST.SUBCLASSHEADER, "AcDbEntity")[0];
+                var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLOR);
+                var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLORRGB);
+
+
+                if (col == null)
+                {
+                    return "ByLayer";
+                }
+
+                if (col.Value.Trim() == "0")
+                {
+                    return "ByBlock";
+                }
+
+                if (colRGB != null)
+                {
+                    //string hexValue = Convert.ToInt32(colRGB.Value.Trim()).ToString("X");
+                    Color color = ColorTranslator.FromHtml(colRGB.Value.Trim());
+
+                    return color.R + "," + color.G + "," + color.B;
+                }
+
+                return col.Value.Trim();
+            }
+            set
+            {
+                if (value == "ByLayer")
+                {
+                    //TODO ... Figure out how to remove lines from List in file object
+                    var AcDbEntity = SubItems(CONST.SUBCLASSHEADER, "AcDbEntity")[0];
+                    var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLOR);
+                    //col.Value = "0";
+                    //Data.Remove(col);
+                    return;
+                }
+
+                if (value == "ByBlock")
+                {
+                    var AcDbEntity = SubItems(CONST.SUBCLASSHEADER, "AcDbEntity")[0];
+                    AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLOR).Value = "0";
+                    return;
+                }
+
+                if (value.Count(c => c == ',') == 2)
+                {
+                    //TODO Create a way to write back RGB values
+                }
+
+                if (int.TryParse(value, out int _value))
+                {
+                    var AcDbEntity = SubItems(CONST.SUBCLASSHEADER, "AcDbEntity")[0];
+                    AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLOR).Value = value;
+                    return;
+                }
+                else
+                {
+                    var AcDbEntity = SubItems(CONST.SUBCLASSHEADER, "AcDbEntity")[0];
+                    AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLOR).Value = "0";
+                    return;
+                }
+
+
+
+            }
+        }
+
+
+        public string Layer
+        {
+            get
+            {
+                var AcDbEntity = SubItems("100", "AcDbEntity")[0];
+                return AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.LAYER).Value;
+            }
+            set
+            {
+                var AcDbEntity = SubItems("100", "AcDbEntity")[0];
+                AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.LAYER).Value = value;
+            }
+        }
+
+
+    }
     public class EntityClass
     {
         public List<ValPair> Data;
@@ -394,7 +478,7 @@ namespace xDXF
             if (R != null)
             {
                 return R.Value;
-            } 
+            }
             else
             {
                 return null;
@@ -408,21 +492,10 @@ namespace xDXF
         }
 
     }
-
-
-
-    public class Entity :EntityClass
+    public class EntitySubClass : EntityClass
     {
 
     }
-
-
-    public class EntitySubClass: EntityClass
-    {
-
-    }
-
-
     public class ValPair
     {
         public int lineIndex;

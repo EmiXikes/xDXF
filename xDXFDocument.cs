@@ -13,7 +13,7 @@ using static xDXF.xDXFHelperMethods;
 
 namespace xDXF
 {
-  public class CONST
+    public class code
     {
         #region Code Consts
         public const string HEADER = "0";
@@ -35,6 +35,20 @@ namespace xDXF
         public const string SCALEZ = "43";
         #endregion
     }
+    [Flags] public enum vpFlag
+    {
+        DELETE = 1,
+        TEST = 2
+        // Used flags:
+        // 1 - marked for deleletion
+        // 2 -
+        // 4 - 
+        // 8 -
+        // 16 -
+    }
+
+
+
 
     public class xDXFDocument
     {
@@ -43,6 +57,7 @@ namespace xDXF
         public string[] RawData;
         public List<string> DataStrings;
         public List<ValPair> DataValPairs = new List<ValPair>();
+
 
         #region Basic IO
 
@@ -75,12 +90,23 @@ namespace xDXF
 
         public void Write2(String FilePath)
         {
+
             List<string> DXFData = new List<string>();
 
             foreach (var dataValPair in DataValPairs)
             {
-                DXFData.Add(dataValPair.Code);
-                DXFData.Add(dataValPair.Value);
+                if (!dataValPair.flags.HasFlag(vpFlag.DELETE))
+                {
+                    DXFData.Add(dataValPair.Code);
+                    DXFData.Add(dataValPair.Value);
+
+                    foreach (var newDataValPair in dataValPair.insertAfterMe)
+                    {
+                        DXFData.Add(newDataValPair.Code);
+                        DXFData.Add(newDataValPair.Value);
+                    }
+
+                }
             }
 
             System.IO.File.WriteAllLines(FilePath, DXFData);
@@ -217,14 +243,14 @@ namespace xDXF
         {
             get
             {
-                return ReadCode(CONST.HANDLE);
+                return ReadCode(code.HANDLE);
             }
         }
         public string Name
         {
             get
             {
-                return ReadCode(CONST.NAME);
+                return ReadCode(code.NAME);
             }
         }
 
@@ -368,10 +394,9 @@ namespace xDXF
         {
             get
             {
-                var AcDbEntity = SubItems(CONST.SUBCLASSHEADER, "AcDbEntity")[0];
-                var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLOR);
-                var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLORRGB);
-
+                var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
+                var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
+                var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
 
                 if (col == null)
                 {
@@ -385,9 +410,7 @@ namespace xDXF
 
                 if (colRGB != null)
                 {
-                    //string hexValue = Convert.ToInt32(colRGB.Value.Trim()).ToString("X");
                     Color color = ColorTranslator.FromHtml(colRGB.Value.Trim());
-
                     return color.R + "," + color.G + "," + color.B;
                 }
 
@@ -395,43 +418,85 @@ namespace xDXF
             }
             set
             {
+                // if new value is ByLayer
+                // ByLayer is the default color. Color is asumed ByLayer, if no color entry exists.
+                // Therefore any color entries must be removed
                 if (value == "ByLayer")
                 {
-                    //TODO ... Figure out how to remove lines from List in file object
-                    var AcDbEntity = SubItems(CONST.SUBCLASSHEADER, "AcDbEntity")[0];
-                    var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLOR);
-                    //col.Value = "0";
-                    //Data.Remove(col);
+                    var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
+                    var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
+                    if(col!= null)
+                    {
+                        Data.Remove(col);
+                        col.flags |= vpFlag.DELETE;
+                    }
+                    var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
+                    if (colRGB != null)
+                    {
+                        Data.Remove(colRGB);
+                        colRGB.flags |= vpFlag.DELETE;
+                    }
                     return;
                 }
-
+                // if new value is ByBlock
                 if (value == "ByBlock")
                 {
-                    var AcDbEntity = SubItems(CONST.SUBCLASSHEADER, "AcDbEntity")[0];
-                    AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLOR).Value = "0";
+                    var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
+                    AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR).Value = "0";
+                    
+                    // in case, if previous color was rgb, rgb entry must be removed
+                    var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
+                    if (colRGB != null)
+                    {
+                        Data.Remove(colRGB);
+                        colRGB.flags |= vpFlag.DELETE;
+                    }
                     return;
                 }
-
+                // if new value is RGB
                 if (value.Count(c => c == ',') == 2)
                 {
-                    //TODO Create a way to write back RGB values
-                }
+                    var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
+                    var RGB = value.Split(',').ToList();
+                    System.Drawing.Color rgbColor = System.Drawing.Color.FromArgb(Convert.ToInt32(RGB[0]), Convert.ToInt32(RGB[1]), Convert.ToInt32(RGB[2]));
+                    var colorCodeIntString = Convert.ToInt32(ColorTranslator.ToHtml(rgbColor).Replace("#",""),16).ToString();
 
+                    var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
+                    var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
+                    if (colRGB != null)
+                    {
+                        colRGB.Value = colorCodeIntString;
+                    }
+                    else
+                    {
+                        ValPair newColRGB = new ValPair()
+                        {
+                            Code = code.COLORRGB,
+                            Value = colorCodeIntString,
+                        };
+                        col.insertAfterMe.Add(newColRGB);
+                    }
+                }
+                // if new value is indexed
                 if (int.TryParse(value, out int _value))
                 {
-                    var AcDbEntity = SubItems(CONST.SUBCLASSHEADER, "AcDbEntity")[0];
-                    AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLOR).Value = value;
+                    var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
+                    AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR).Value = value;
+
+                    // in case, if previous color was rgb
+                    var rgbColValPair = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
+                    if (rgbColValPair != null)
+                    {
+                        Data.Remove(rgbColValPair);
+                        rgbColValPair.flags |= vpFlag.DELETE;
+                    }
                     return;
                 }
                 else
                 {
-                    var AcDbEntity = SubItems(CONST.SUBCLASSHEADER, "AcDbEntity")[0];
-                    AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.COLOR).Value = "0";
+                    // if an invalid entry is entered. Do nothing.
                     return;
                 }
-
-
-
             }
         }
 
@@ -441,12 +506,12 @@ namespace xDXF
             get
             {
                 var AcDbEntity = SubItems("100", "AcDbEntity")[0];
-                return AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.LAYER).Value;
+                return AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.LAYER).Value;
             }
             set
             {
                 var AcDbEntity = SubItems("100", "AcDbEntity")[0];
-                AcDbEntity.FirstOrDefault(C => C.Code.Trim() == CONST.LAYER).Value = value;
+                AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.LAYER).Value = value;
             }
         }
 
@@ -498,9 +563,19 @@ namespace xDXF
     }
     public class ValPair
     {
-        public int lineIndex;
         public string Code;
         public string Value;
+
+        public int lineIndex;
+
+        public List<ValPair> insertAfterMe = new List<ValPair>();
+
+        public vpFlag flags;
+
+
+
+
+
     }
     #endregion
 

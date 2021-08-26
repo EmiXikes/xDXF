@@ -289,7 +289,7 @@ namespace xDXF
 
         /// <summary>
         /// <para> Get or Set block Scale </para>
-        /// <para> Don't use on blocks with attributes. For now Block attributes are not updated correctly when writing back Position, Scale or Rotation. </para>
+        /// <para> Don't use on blocks with attributes. For now Block attributes are not updated correctly when changing block Position, Scale or Rotation. </para>
         /// </summary>
         public Vector3 Scale
         {
@@ -388,8 +388,6 @@ namespace xDXF
     #region Strcture Items
     public class Entity : EntityClass
     {
-        // TODO Color
-
         public string Color
         {
             get
@@ -499,8 +497,6 @@ namespace xDXF
                 }
             }
         }
-
-
         public string Layer
         {
             get
@@ -514,8 +510,6 @@ namespace xDXF
                 AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.LAYER).Value = value;
             }
         }
-
-
     }
     public class EntityClass
     {

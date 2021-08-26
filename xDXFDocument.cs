@@ -474,6 +474,7 @@ namespace xDXF
                         };
                         col.insertAfterMe.Add(newColRGB);
                     }
+                    return;
                 }
                 // if new value is indexed
                 if (int.TryParse(value, out int _value))

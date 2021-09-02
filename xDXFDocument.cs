@@ -82,6 +82,8 @@ namespace xDXF
 
                 valPairIndex++;
             }
+
+            BlockRecords = SubItems(DataValPairs, "0", "BLOCK_RECORD");
         }
 
         #endregion
@@ -117,7 +119,84 @@ namespace xDXF
 
         #endregion
 
-        public Dictionary<string, xInsert> Inserts()
+        List<List<ValPair>> BlockRecords;
+
+
+        public Dictionary<string, xInsert> Inserts
+        {
+            get 
+            { 
+                return GetInserts(); 
+            }
+        }
+        public Dictionary<string, ValPair> HeaderVariables
+        {
+            get
+            {
+                return GetHeaderVariables();
+            }
+        }
+        public Dictionary<string, List<ValPair>> Layouts
+        {
+            get
+            {
+                return GetLayouts();
+            }
+        }
+
+
+
+
+        public Dictionary<string, List<ValPair>> Sections()
+        {
+            Dictionary<string, List<ValPair>> Result = new Dictionary<string, List<ValPair>>();
+
+            var S = SubItems(DataValPairs, "0", "SECTION");
+
+            foreach (var sect in S)
+            {
+                Result.Add(sect.FirstOrDefault(C => C.Code.Trim() == "2").Value, sect);
+            }
+
+            return Result;
+        }
+
+
+
+
+        #region Private Functions
+        private Dictionary<string, List<ValPair>> GetLayouts()
+        {
+            Dictionary<string, List<ValPair>> Result = new Dictionary<string, List<ValPair>>();
+
+            var lyts =  SubItems(DataValPairs, "0", "LAYOUT", true);
+
+            foreach (var lyt in lyts)
+            {
+
+                var AcDbLayout = SubItems(lyt, "100", "AcDbLayout", true);
+
+
+                Result.Add(AcDbLayout[0].FirstOrDefault(C => C.Code.Trim() == "1").Value, lyt);
+            }
+
+            return Result;
+        }
+        private Dictionary<string, ValPair> GetHeaderVariables()
+        {
+
+            Dictionary<string, ValPair> Result = new Dictionary<string, ValPair>();
+
+            var Sections = SubItems(DataValPairs, "0", "SECTION");
+
+            foreach (List<ValPair> I in SubItems(Sections[0], "9"))
+            {
+                Result.Add(I[0].Value, I[1]);
+            }
+
+            return Result;
+        }
+        private Dictionary<string, xInsert> GetInserts()
         {
             Dictionary<string, xInsert> R = new Dictionary<string, xInsert>();
 
@@ -177,58 +256,32 @@ namespace xDXF
                     }
                 }
 
-                R.Add(handle, new xInsert { Data = insert, _a = AttributeValues });
+                R.Add(handle, new xInsert { Data = insert, _a = AttributeValues, _tn = GetBlockName(insert) });
             }
             return R;
         }
 
-        public Dictionary<string, ValPair> HeaderVariables()
+        private string GetBlockName(List<ValPair> insert)
         {
+            var insertHardOwner = insert.FirstOrDefault(c => c.Code.Trim() == "360");
+            var insertName = insert.FirstOrDefault(c => c.Code.Trim() == "2").Value;
 
-            Dictionary<string, ValPair> Result = new Dictionary<string, ValPair>();
-
-            var Sections = SubItems(DataValPairs, "0", "SECTION");
-
-            foreach (List<ValPair> I in SubItems(Sections[0], "9"))
+            if (insertHardOwner == null)
             {
-                Result.Add(I[0].Value, I[1]);
-            }
+                return insertName;
+            } else
+            {
+                //Method No 1
+                var insertBlockRecord = BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == "2").Value == insertName);
+                var sourceBlockRecordHandle = insertBlockRecord.FirstOrDefault(C => C.Code.Trim() == "1005").Value;
+                var sourceBlockReocrd = BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == "5").Value == sourceBlockRecordHandle);
+                return sourceBlockReocrd.FirstOrDefault(C => C.Code.Trim() == "2").Value;
 
-            return Result;
+                //Method No 2
+            }
         }
 
-        public Dictionary<string, List<ValPair>> Sections()
-        {
-            Dictionary<string, List<ValPair>> Result = new Dictionary<string, List<ValPair>>();
-
-            var S = SubItems(DataValPairs, "0", "SECTION");
-
-            foreach (var sect in S)
-            {
-                Result.Add(sect.FirstOrDefault(C => C.Code.Trim() == "2").Value, sect);
-            }
-
-            return Result;
-        }
-
-        public Dictionary<string, List<ValPair>> Layouts()
-        {
-            Dictionary<string, List<ValPair>> Result = new Dictionary<string, List<ValPair>>();
-
-            var lyts =  SubItems(DataValPairs, "0", "LAYOUT", true);
-
-            foreach (var lyt in lyts)
-            {
-
-                var AcDbLayout = SubItems(lyt, "100", "AcDbLayout", true);
-
-
-                Result.Add(AcDbLayout[0].FirstOrDefault(C => C.Code.Trim() == "1").Value, lyt);
-            }
-
-            return Result;
-        }
-
+        #endregion
 
 
 
@@ -253,15 +306,19 @@ namespace xDXF
                 return ReadCode(code.NAME);
             }
         }
-
-        // TODO Name
-
+        public string TrueName
+        {
+            get { return _tn; }
+        }
 
         // TODO LineType
 
         // TODO Attributes not updated correctly when editing block Position, Scale or Rotation.
 
-        [Description("This is the description for SpaceKey")]
+        /// <summary>
+        /// <para> Get or Set block Position </para>
+        /// <para> Don't use to set value on blocks with attributes. For now Block attributes are not updated correctly when changing block Position, Scale or Rotation. </para>
+        /// </summary>
         public Vector3 Postion
         {
             get
@@ -289,7 +346,7 @@ namespace xDXF
 
         /// <summary>
         /// <para> Get or Set block Scale </para>
-        /// <para> Don't use on blocks with attributes. For now Block attributes are not updated correctly when changing block Position, Scale or Rotation. </para>
+        /// <para> Don't use to set value on blocks with attributes. For now Block attributes are not updated correctly when changing block Position, Scale or Rotation. </para>
         /// </summary>
         public Vector3 Scale
         {
@@ -326,6 +383,11 @@ namespace xDXF
                 //  scale = value;
             }
         }
+
+        /// <summary>
+        /// <para> Get or Set block Rotation </para>
+        /// <para> Don't use to set value on blocks with attributes. For now Block attributes are not updated correctly when changing block Position, Scale or Rotation. </para>
+        /// </summary>
         public float Rotation
         {
             get
@@ -367,7 +429,18 @@ namespace xDXF
         {
             return SubItems("0", "ATTRIB");
         }
+
+        /// <summary>
+        /// <para> Attribute values. Values can be changed. To get other attribute data, use method Attributes(). </para>
+        /// </summary>
         public Dictionary<string, ValPair> AttributeValues { get => _a; }
+        /// <summary>
+        /// <para> READ ONLY!!! Attribute values. Joined multiline values (for dwg versions lower than 2013). </para>
+        /// </summary>
+        public Dictionary<string, ValPair> AttributeValuesJoined 
+        {
+            get => _a; 
+        }
 
         #region Constructor stuff and privates
 
@@ -377,6 +450,7 @@ namespace xDXF
         }
 
         public Dictionary<string, ValPair> _a;
+        public string _tn;
 
         private Vector3 scale;
         private Vector3 postion;

@@ -256,7 +256,12 @@ namespace xDXF
                     }
                 }
 
-                R.Add(handle, new xInsert { Data = insert, _a = AttributeValues, _tn = GetBlockName(insert) });
+                R.Add(handle, new xInsert 
+                {
+                    Data = insert, 
+                    _a = AttributeValues, 
+                    _tn = GetBlockName(insert) 
+                });
             }
             return R;
         }
@@ -264,7 +269,7 @@ namespace xDXF
         private string GetBlockName(List<ValPair> insert)
         {
             var insertHardOwner = insert.FirstOrDefault(c => c.Code.Trim() == "360");
-            var insertName = insert.FirstOrDefault(c => c.Code.Trim() == "2").Value;
+            var insertName = insert.FirstOrDefault(c => c.Code.Trim() == code.NAME).Value;
 
             if (insertHardOwner == null)
             {
@@ -272,10 +277,10 @@ namespace xDXF
             } else
             {
                 //Method No 1
-                var insertBlockRecord = BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == "2").Value == insertName);
+                var insertBlockRecord = BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == code.NAME).Value == insertName);
                 var sourceBlockRecordHandle = insertBlockRecord.FirstOrDefault(C => C.Code.Trim() == "1005").Value;
-                var sourceBlockReocrd = BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == "5").Value == sourceBlockRecordHandle);
-                return sourceBlockReocrd.FirstOrDefault(C => C.Code.Trim() == "2").Value;
+                var sourceBlockReocrd = BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == code.HANDLE).Value == sourceBlockRecordHandle);
+                return sourceBlockReocrd.FirstOrDefault(C => C.Code.Trim() == code.NAME).Value;
 
                 //Method No 2
             }
@@ -310,6 +315,8 @@ namespace xDXF
         {
             get { return _tn; }
         }
+
+        // Dynamic Properties
 
         // TODO LineType
 
@@ -435,10 +442,11 @@ namespace xDXF
         /// </summary>
         public Dictionary<string, ValPair> AttributeValues { get => _a; }
         /// <summary>
-        /// <para> READ ONLY!!! Attribute values. Joined multiline values (for dwg versions lower than 2013). </para>
+        /// <para> READ ONLY!!! Attribute values. Joined multiline values (for dwg versions lower than 2018). </para>
         /// </summary>
         public Dictionary<string, ValPair> AttributeValuesJoined 
         {
+            // TODO implement joining..
             get => _a; 
         }
 

@@ -7,12 +7,14 @@ using System.Linq;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using static xDXF.xDXFHelperMethods;
 
 
 namespace xDXF
 {
+    
     public class code
     {
         #region Code Consts
@@ -58,12 +60,13 @@ namespace xDXF
         public List<string> DataStrings;
         public List<ValPair> DataValPairs = new List<ValPair>();
 
+        public string dSep = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
 
         #region Basic IO
 
         #region Load File
 
-        public void Load2(string FilePath)
+        public void Open(string FilePath)
         {
             RawData = File.ReadAllLines(FilePath);
             DataStrings = new List<string>();
@@ -90,7 +93,7 @@ namespace xDXF
 
         #region Write File
 
-        public void Write2(String FilePath)
+        public void SaveAs(String FilePath)
         {
 
             List<string> DXFData = new List<string>();
@@ -297,6 +300,8 @@ namespace xDXF
 
     public class xInsert : Entity
     {
+        public string dSep = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
+        Regex RX = new Regex("[.,]");
         public string Handle
         {
             get
@@ -331,9 +336,9 @@ namespace xDXF
             get
             {
                 var AcDbBlockReference = SubItems("100", "AcDbBlockReference")[0];
-                postion.X = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "10").Value.Replace(".", ","));
-                postion.Y = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "20").Value.Replace(".", ","));
-                postion.Z = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "30").Value.Replace(".", ","));
+                postion.X = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "10").Value, dSep));
+                postion.Y = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "20").Value, dSep));
+                postion.Z = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "30").Value, dSep));
                 return postion;
             }
             set
@@ -364,9 +369,9 @@ namespace xDXF
 
                 if (scValPair != null)
                 {
-                    scale.X = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41").Value.Replace(".", ","));
-                    scale.Y = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "42").Value.Replace(".", ","));
-                    scale.Z = float.Parse(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43").Value.Replace(".", ","));
+                    scale.X = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41").Value,dSep));
+                    scale.Y = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "42").Value,dSep));
+                    scale.Z = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43").Value,dSep));
                 }
                 else
                 {
@@ -404,7 +409,7 @@ namespace xDXF
                 string rot;
                 if (rotValpair != null)
                 {
-                    rot = rotValpair.Value.Replace(".", ",");
+                    rot = RX.Replace(rotValpair.Value, dSep);
                 }
                 else
                 {
@@ -422,10 +427,20 @@ namespace xDXF
                 var rotValpair = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "50");
                 if (rotValpair != null)
                 {
-                    rotValpair.Value = value.ToString();
+                    if (value == 0)
+                    {
+                        Data.Remove(rotValpair);
+                        rotValpair.flags |= vpFlag.DELETE;
+                    }
+                    else 
+                    {
+                        rotValpair.Value = value.ToString();
+                    }
                 }
                 else
                 {
+                    var poszValPair = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "30");
+                    poszValPair.insertAfterMe.Add(new ValPair { Code = "50", Value = value.ToString() });
                     // TODO If original rotation was 0, the ValPair entry does not exist.
                     // Need to add these lines to the file and test if it still works.
                 }

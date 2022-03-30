@@ -55,7 +55,7 @@ namespace xDXF
     public class xDXFDocument
     {
         public string versionDescription = "Epic xDXF 0.4";
-        
+
         public string[] RawData;
         public List<string> DataStrings;
         public List<ValPair> DataValPairs = new List<ValPair>();
@@ -124,12 +124,11 @@ namespace xDXF
 
         List<List<ValPair>> BlockRecords;
 
-
         public Dictionary<string, xInsert> Inserts
         {
-            get 
-            { 
-                return GetInserts(); 
+            get
+            {
+                return GetInserts();
             }
         }
         public Dictionary<string, ValPair> HeaderVariables
@@ -146,7 +145,17 @@ namespace xDXF
                 return GetLayouts();
             }
         }
-
+        public Dictionary<string, Layer> Layers
+        {
+            get 
+            { 
+                return GetLayers(); 
+            }
+            //set
+            //{
+            //    layers = value;
+            //}
+        }
 
 
 
@@ -164,15 +173,28 @@ namespace xDXF
             return Result;
         }
 
-
-
-
         #region Private Functions
+        private Dictionary<string, Layer> GetLayers()
+        {
+            var Tables = SubItems(DataValPairs, "0", "TABLE");
+            var Layers = Tables.FirstOrDefault(n => n.FirstOrDefault(x => x.Code.Trim() == "2").Value == "LAYER");
+            var LayersSplit = SubItems(Layers, "0", "LAYER");
+
+            Dictionary<string, Layer> R = new Dictionary<string, Layer>();
+            foreach (var layer in LayersSplit)
+            {
+                var layName = SubItems(layer, code.NAME)[0][0].Value;
+                Layer lyr = new Layer() { Data = layer };
+                R.Add(layName, lyr);
+            }
+
+            return R;
+        }
         private Dictionary<string, List<ValPair>> GetLayouts()
         {
             Dictionary<string, List<ValPair>> Result = new Dictionary<string, List<ValPair>>();
 
-            var lyts =  SubItems(DataValPairs, "0", "LAYOUT", true);
+            var lyts = SubItems(DataValPairs, "0", "LAYOUT", true);
 
             foreach (var lyt in lyts)
             {
@@ -209,12 +231,36 @@ namespace xDXF
             var dxfVersion = SubItems(SubItems(DataValPairs, "0", "SECTION")[0], "9", "$ACADVER")[0][1].Value;
             var inserts = SubItems(Ents, "0", "INSERT");
 
-            
-
             foreach (var insert in inserts)
             {
                 var handle = insert.FirstOrDefault(h => h.Code.Trim() == "5").Value;
                 handle = SubItems(insert, "5")[0][0].Value;
+
+                var insertName = insert.FirstOrDefault(c => c.Code.Trim() == code.NAME).Value;
+                var insertBlockRecord = BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == code.NAME).Value == insertName);
+                var blockTypeFlag = SubItems(insertBlockRecord, "70")[0][0].Value;
+
+                // xref Check
+                bool IsXref = false;
+                string XrefPath = "";
+                bool XrefResolved = false;
+                if ((Int32.Parse(blockTypeFlag) & 4) == 4)
+                {
+                    IsXref = true;
+                    var _xp = SubItems(insertBlockRecord, "1");
+                    if (_xp.Count != 0)
+                    {
+                        XrefPath = _xp[0][0].Value;
+                        XrefResolved = true;
+                    }
+                    else
+                    {
+                        XrefResolved = false;
+                    }
+
+                    //                    var bName = SubItems(insertBlockRecord, "2")[0][0].Value;
+
+                }
 
                 var AttrtbutesInInsert = SubItems(insert, "0", "ATTRIB");
 
@@ -239,7 +285,7 @@ namespace xDXF
                                     item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
                                     item_embeddedObj[0].FirstOrDefault(c => c.Code.Trim() == "1"));
 
-                                
+
                             }
                             else
                             {
@@ -259,11 +305,14 @@ namespace xDXF
                     }
                 }
 
-                R.Add(handle, new xInsert 
+                R.Add(handle, new xInsert
                 {
-                    Data = insert, 
-                    _a = AttributeValues, 
-                    _tn = GetBlockName(insert) 
+                    Data = insert,
+                    IsXref = IsXref,
+                    XrefPath = XrefPath,
+                    XrefResolved = XrefResolved,
+                    _a = AttributeValues,
+                    _tn = GetBlockName(insert)
                 });
             }
             return R;
@@ -277,7 +326,8 @@ namespace xDXF
             if (insertHardOwner == null)
             {
                 return insertName;
-            } else
+            }
+            else
             {
                 //Method No 1
                 var insertBlockRecord = BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == code.NAME).Value == insertName);
@@ -294,8 +344,6 @@ namespace xDXF
 
 
     }
-
-
 
 
     public class xInsert : Entity
@@ -321,6 +369,10 @@ namespace xDXF
             get { return _tn; }
         }
 
+        public bool IsXref { get; set; }
+        public string XrefPath { get; set; }
+        public bool XrefResolved { get; set; }
+       
         // Dynamic Properties
 
         // TODO LineType
@@ -481,35 +533,248 @@ namespace xDXF
         #endregion
 
     }
+    public class Layer : EntityClass
+    {
+        public string Name
+        {
+            get
+            {
+                var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+                var LayName = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.NAME);
+                return LayName.Value;
+            }
+            //set
+            //{
+            //    var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+            //    var LayName = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.NAME);
+
+            //    LayName.Value = value;
+            //}
+        }
+        public bool IsVisible
+        {
+            get
+            {
+                var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+                var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
+
+                return int.Parse(col.Value) >= 0;
+            }
+            set
+            {
+                var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+                var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
+
+                if (int.Parse(col.Value) >= 0)
+                {
+                    //initial value true
+                    if (!value)
+                    {
+                        var res = int.Parse(col.Value) * -1;
+                        col.Value = res.ToString();
+                    }
+
+                }
+                else
+                {
+                    //initial value false
+                    if (value)
+                    {
+                        var res = int.Parse(col.Value) * -1;
+                        col.Value = res.ToString();
+                    }
+                }
+            }
+        }
+        public bool IsFrozen
+        {
+            get
+            {
+                var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+                var LayFlags = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == "70");
+
+                if ((int.Parse(LayFlags.Value) & 1) == 1)
+                {
+                    return true;
+                }
+                return false;
+            }
+            set
+            {
+                var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+                var LayFlags = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == "70");
+
+                int res = int.Parse(LayFlags.Value);
+
+                res |= 1;
+
+                LayFlags.Value = res.ToString();
+
+            }
+        }
+        public bool IsLocked
+        {
+            get
+            {
+                var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+                var LayFlags = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == "70");
+
+                if ((int.Parse(LayFlags.Value) & 4) == 4)
+                {
+                    return true;
+                }
+                return false;
+            }
+            set
+            {
+                var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+                var LayFlags = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == "70");
+
+                int res = int.Parse(LayFlags.Value);
+
+                res |= 4;
+
+                LayFlags.Value = res.ToString();
+            }
+        }
+        public bool IsPlotting
+        {
+            get 
+            {
+                var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+                var LayPlot = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == "290");
+                
+                if(LayPlot != null)
+                {
+                    return false;
+                }
+                return true;
+            }
+            set
+            {
+                var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+                var LayPlot = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == "290");
+                var LineBeforeLayPlot = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == "6");
+
+                if (LayPlot != null)
+                {
+                    // if initial value false
+                    if (value)
+                    {
+                        LayPlot.flags |= vpFlag.DELETE;
+                    }
+                }
+                else
+                {
+                    //if initial value true
+                    if (!value)
+                    {
+                        LineBeforeLayPlot.insertAfterMe.Add(new ValPair { Code = "290", Value = "0" });
+                    }
+
+                }
+            }
+        }
+        public string Color
+        {
+            get
+            {
+                return GetLayerColor();
+            }
+            set
+            {
+                SetLayerColor(value);
+            }
+        }
+
+        private void SetLayerColor(string value)
+        {
+            // if new value is RGB
+            if (value.Count(c => c == ',') == 2)
+            {
+                SetLayerColorRGB(value);
+                return;
+            }
+            // if new value is indexed
+            if (int.TryParse(value, out int _value))
+            {
+                SetLayerColorIndexed(value);
+                return;
+            }
+            else
+            {
+                // if an invalid entry is entered. Do nothing.
+                return;
+            }
+        }
+
+        private string GetLayerColor()
+        {
+            var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+            var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
+            var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
+
+            if (colRGB != null)
+            {
+                Color color = ColorTranslator.FromHtml(colRGB.Value.Trim());
+                return color.R + "," + color.G + "," + color.B;
+            }
+
+            return col.Value.Trim();
+        }
+
+        private void SetLayerColorIndexed(string value)
+        {
+            var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+            AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR).Value = value;
+
+            // in case, if previous color was rgb
+            var rgbColValPair = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
+            if (rgbColValPair != null)
+            {
+                Data.Remove(rgbColValPair);
+                rgbColValPair.flags |= vpFlag.DELETE;
+            }
+        }
+
+        private void SetLayerColorRGB(string value)
+        {
+            var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbLayerTableRecord")[0];
+            var RGB = value.Split(',').ToList();
+            System.Drawing.Color rgbColor = System.Drawing.Color.FromArgb(Convert.ToInt32(RGB[0]), Convert.ToInt32(RGB[1]), Convert.ToInt32(RGB[2]));
+            var colorCodeIntString = Convert.ToInt32(ColorTranslator.ToHtml(rgbColor).Replace("#", ""), 16).ToString();
+
+            var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
+            var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
+            if (colRGB != null)
+            {
+                colRGB.Value = colorCodeIntString;
+            }
+            else
+            {
+                ValPair newColRGB = new ValPair()
+                {
+                    Code = code.COLORRGB,
+                    Value = colorCodeIntString,
+                };
+                col.insertAfterMe.Add(newColRGB);
+            }
+        }
+
+
+    }
+
 
     #region Strcture Items
+
+
     public class Entity : EntityClass
     {
         public string Color
         {
             get
             {
-                var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
-                var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
-                var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
-
-                if (col == null)
-                {
-                    return "ByLayer";
-                }
-
-                if (col.Value.Trim() == "0")
-                {
-                    return "ByBlock";
-                }
-
-                if (colRGB != null)
-                {
-                    Color color = ColorTranslator.FromHtml(colRGB.Value.Trim());
-                    return color.R + "," + color.G + "," + color.B;
-                }
-
-                return col.Value.Trim();
+                return GetEntityColor();
             }
             set
             {
@@ -551,41 +816,13 @@ namespace xDXF
                 // if new value is RGB
                 if (value.Count(c => c == ',') == 2)
                 {
-                    var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
-                    var RGB = value.Split(',').ToList();
-                    System.Drawing.Color rgbColor = System.Drawing.Color.FromArgb(Convert.ToInt32(RGB[0]), Convert.ToInt32(RGB[1]), Convert.ToInt32(RGB[2]));
-                    var colorCodeIntString = Convert.ToInt32(ColorTranslator.ToHtml(rgbColor).Replace("#",""),16).ToString();
-
-                    var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
-                    var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
-                    if (colRGB != null)
-                    {
-                        colRGB.Value = colorCodeIntString;
-                    }
-                    else
-                    {
-                        ValPair newColRGB = new ValPair()
-                        {
-                            Code = code.COLORRGB,
-                            Value = colorCodeIntString,
-                        };
-                        col.insertAfterMe.Add(newColRGB);
-                    }
+                    SetEntityColorRGB(value);
                     return;
                 }
                 // if new value is indexed
                 if (int.TryParse(value, out int _value))
                 {
-                    var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
-                    AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR).Value = value;
-
-                    // in case, if previous color was rgb
-                    var rgbColValPair = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
-                    if (rgbColValPair != null)
-                    {
-                        Data.Remove(rgbColValPair);
-                        rgbColValPair.flags |= vpFlag.DELETE;
-                    }
+                    SetEntityColorIndexed(value);
                     return;
                 }
                 else
@@ -595,6 +832,9 @@ namespace xDXF
                 }
             }
         }
+
+
+
         public string Layer
         {
             get
@@ -624,9 +864,6 @@ namespace xDXF
 
         }
 
-
-
-
         public string ReadCode(string Code)
         {
 
@@ -646,6 +883,72 @@ namespace xDXF
         public void WriteCode(string Code, string Value)
         {
             Data.FirstOrDefault(x => x.Code.Trim() == Code.Trim()).Value = Value;
+        }
+
+        public void SetEntityColorIndexed(string value)
+        {
+            var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
+            AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR).Value = value;
+
+            // in case, if previous color was rgb
+            var rgbColValPair = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
+            if (rgbColValPair != null)
+            {
+                Data.Remove(rgbColValPair);
+                rgbColValPair.flags |= vpFlag.DELETE;
+            }
+        }
+
+        public void SetEntityColorRGB(string value)
+        {
+            var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
+            var RGB = value.Split(',').ToList();
+            System.Drawing.Color rgbColor = System.Drawing.Color.FromArgb(Convert.ToInt32(RGB[0]), Convert.ToInt32(RGB[1]), Convert.ToInt32(RGB[2]));
+            var colorCodeIntString = Convert.ToInt32(ColorTranslator.ToHtml(rgbColor).Replace("#", ""), 16).ToString();
+
+            var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
+            var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
+            if (colRGB != null)
+            {
+                colRGB.Value = colorCodeIntString;
+            }
+            else
+            {
+                ValPair newColRGB = new ValPair()
+                {
+                    Code = code.COLORRGB,
+                    Value = colorCodeIntString,
+                };
+                col.insertAfterMe.Add(newColRGB);
+            }
+        }
+
+
+
+
+        public string GetEntityColor()
+        {
+            var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
+            var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
+            var colRGB = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
+
+            if (col == null)
+            {
+                return "ByLayer";
+            }
+
+            if (col.Value.Trim() == "0")
+            {
+                return "ByBlock";
+            }
+
+            if (colRGB != null)
+            {
+                Color color = ColorTranslator.FromHtml(colRGB.Value.Trim());
+                return color.R + "," + color.G + "," + color.B;
+            }
+
+            return col.Value.Trim();
         }
 
     }

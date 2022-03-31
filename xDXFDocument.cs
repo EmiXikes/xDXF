@@ -121,6 +121,17 @@ namespace xDXF
 
         public List<List<ValPair>> BlockRecords;
 
+        public string DXFVersion
+        {
+            get
+            {
+                var dxfVersion = SubItems(
+                    SubItems(DataValPairs, "0", "SECTION")[0],
+                    "9", "$ACADVER")[0][1].Value;
+                return dxfVersion;
+            }
+        }
+
         public Dictionary<string, xInsert> Inserts
         {
             get
@@ -144,9 +155,9 @@ namespace xDXF
         }
         public Dictionary<string, Layer> Layers
         {
-            get 
-            { 
-                return GetLayers(); 
+            get
+            {
+                return GetLayers();
             }
             //set
             //{
@@ -191,12 +202,12 @@ namespace xDXF
         {
             Dictionary<string, List<ValPair>> Result = new Dictionary<string, List<ValPair>>();
 
-            var lyts = SubItems(DataValPairs, "0", "LAYOUT", true);
+            var lyts = SubItems(DataValPairs, "0", "LAYOUT");
 
             foreach (var lyt in lyts)
             {
 
-                var AcDbLayout = SubItems(lyt, "100", "AcDbLayout", true);
+                var AcDbLayout = SubItems(lyt, "100", "AcDbLayout");
 
 
                 Result.Add(AcDbLayout[0].FirstOrDefault(C => C.Code.Trim() == "1").Value, lyt);
@@ -277,7 +288,7 @@ namespace xDXF
 
     }
 
-#region Strcture Items
+    #region Strcture Items
     public class EntitySubClass : EntityClass
     {
 

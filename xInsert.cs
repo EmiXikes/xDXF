@@ -9,9 +9,6 @@ namespace xDXF
 {
     public class xInsert : Entity
     {
-        public string dSep = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
-        Regex RX = new Regex("[.,]");
-
         public xDXFDocument hostDoc { get; set; }
         public string Handle
         {
@@ -31,34 +28,6 @@ namespace xDXF
         {
             get { return GetTrueName(); }
         }
-
-        private string GetTrueName()
-        {
-            var insertHardOwner = Data.FirstOrDefault(c => c.Code.Trim() == "360");
-            var insertName = Data.FirstOrDefault(c => c.Code.Trim() == code.NAME).Value;
-
-            if (insertHardOwner == null)
-            {
-                return insertName;
-            }
-            else
-            {
-                //Method No 1
-                var insertBlockRecord = hostDoc.BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == code.NAME).Value == insertName);
-                var sourceBlockRecordHandle = insertBlockRecord.FirstOrDefault(C => C.Code.Trim() == "1005").Value;
-                var sourceBlockReocrd = hostDoc.BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == code.HANDLE).Value == sourceBlockRecordHandle);
-                return sourceBlockReocrd.FirstOrDefault(C => C.Code.Trim() == code.NAME).Value;
-
-                //Method No 2
-            }
-            throw new NotImplementedException();
-        }
-
-        public bool IsXref { get; set; }
-        public string XrefPath { get; set; }
-        public bool XrefResolved { get; set; }
-
-        
 
         // Dynamic Properties
 
@@ -103,7 +72,7 @@ namespace xDXF
         {
             get
             {
-                var AcDbBlockReference = SubItems("100", "AcDbBlockReference")[0];
+                var AcDbBlockReference = SubItems("100", "AcDbBlockReference", new[] {"0","100"} )[0];
                 var scValPair = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41");
 
                 if (scValPair != null)
@@ -122,7 +91,7 @@ namespace xDXF
             }
             set
             {
-                var AcDbBlockReference = SubItems("100", "AcDbBlockReference")[0];
+                var AcDbBlockReference = SubItems("100", "AcDbBlockReference", new[] { "0", "100" })[0];
                 var scValPair = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41");
                 if (scValPair != null)
                 {
@@ -186,53 +155,123 @@ namespace xDXF
             }
         }
 
-        public List<List<ValPair>> GetAttributesData()
-        {
-            return SubItems("0", "ATTRIB");
-        }
-
         /// <summary>
-        /// <para> Attribute values. Values can be changed. To get other attribute data, use method Attributes(). </para>
+        /// <para> Attribute values. Only single-line attributes can be set. </para>
+        /// <para> Multiline attributes can be read, but will not be set. </para>
         /// </summary>
-        public Dictionary<string, List<ValPair>> AttributeValues
+        public Dictionary<string, string> AttributeValues
         {
             get
             {
-                return null;
-            }
-        }
-        /// <summary>
-        /// <para> READ ONLY!!! Attribute values. Joined multiline values (for dwg versions lower than 2018). </para>
-        /// </summary>
-        public Dictionary<string, string> AttributeValuesStr
-        {
-            // TODO implement joining..
-            get
-            {
-                //return _a;
                 return GetAttributeValues();
             }
+            set
+            {
+                SetAttributeValues(value);
+            }
+        }
+
+        public bool IsXref { get; set; }
+        public string XrefPath { get; set; }
+        public bool XrefResolved { get; set; }
+
+        #region privates
+        private string dSep = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
+        private Regex RX = new Regex("[.,]");
+
+        private string GetTrueName()
+        {
+            var insertHardOwner = Data.FirstOrDefault(c => c.Code.Trim() == "360");
+            var insertName = Data.FirstOrDefault(c => c.Code.Trim() == code.NAME).Value;
+
+            if (insertHardOwner == null)
+            {
+                return insertName;
+            }
+            else
+            {
+                //Method No 1
+                var insertBlockRecord = hostDoc.BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == code.NAME).Value == insertName);
+                var sourceBlockRecordHandle = insertBlockRecord.FirstOrDefault(C => C.Code.Trim() == "1005").Value;
+                var sourceBlockReocrd = hostDoc.BlockRecords.FirstOrDefault(BR => BR.FirstOrDefault(C => C.Code.Trim() == code.HANDLE).Value == sourceBlockRecordHandle);
+                return sourceBlockReocrd.FirstOrDefault(C => C.Code.Trim() == code.NAME).Value;
+
+                //Method No 2
+            }
+            throw new NotImplementedException();
+        }
+        private void SetAttributeValues(Dictionary<string, string> value)
+        {
+            List<List<ValPair>> AttributesInInsert = SubItems("0", "ATTRIB");
+
+            foreach (var newAttr in value)
+            {
+                if (Int32.Parse(hostDoc.DXFVersion.Substring(2)) > 1027)
+                {
+                    // dxf version above 2013 (2018+)
+                    var insAttr = (from A in AttributesInInsert
+                                   where xDXFHelperMethods.SubItems(A, "100", "AcDbAttribute")[0]
+                                   .FirstOrDefault(c => c.Code.Trim() == "2").Value == newAttr.Key
+                                   select A).ToList();
+                    if (insAttr.Count == 0) continue;
+
+                    var item_AcDbAttribute = xDXFHelperMethods.SubItems(insAttr[0], "100", "AcDbAttribute");
+                    var item_AcDbText = xDXFHelperMethods.SubItems(insAttr[0], "100", "AcDbText");
+                    var item_embeddedObj = xDXFHelperMethods.SubItems(insAttr[0], "101", "Embedded Object");
+
+                    if (item_embeddedObj.Count != 0)
+                    {
+                        // MultiLine attributes
+                        // not supported
+                    }
+                    else
+                    {
+                        // SingleLine attributes
+                        item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1").Value = newAttr.Value;
+                    }
+                }
+                else
+                {
+                    // dxf version up to 2013
+                    var insAttr = (from A in AttributesInInsert
+                                   where xDXFHelperMethods.SubItems(A, "100", "AcDbAttribute")[0]
+                                   .FirstOrDefault(c => c.Code.Trim() == "2").Value == newAttr.Key
+                                   select A).ToList();
+                    if (insAttr.Count == 0) continue;
+                    if (insAttr.Count > 1)
+                    {
+                        // Multiline attributes
+                        // not supported
+                    }
+                    if (insAttr.Count == 1)
+                    {
+                        // SingleLine attributes
+                        var item_AcDbAttribute = xDXFHelperMethods.SubItems(insAttr[0], "100", "AcDbAttribute");
+                        var item_AcDbText = xDXFHelperMethods.SubItems(insAttr[0], "100", "AcDbText");
+                        item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1").Value = newAttr.Value;
+                    }
+
+
+                }
+
+            }
+
         }
 
         private Dictionary<string, string> GetAttributeValues()
         {
             var AttrtbutesInInsert = SubItems("0", "ATTRIB");
 
-            var dxfVersion = xDXFHelperMethods.SubItems(
-                xDXFHelperMethods.SubItems(hostDoc.DataValPairs, "0", "SECTION")[0],
-                "9", "$ACADVER")[0][1].Value;
-
             Dictionary<string, string> AttributeValues = new Dictionary<string, string>();
 
             if (AttrtbutesInInsert.Count != 0)
             {
-
                 foreach (List<ValPair> attr in AttrtbutesInInsert)
                 {
                     var item_AcDbAttribute = xDXFHelperMethods.SubItems(attr, "100", "AcDbAttribute");
                     var item_AcDbText = xDXFHelperMethods.SubItems(attr, "100", "AcDbText");
 
-                    if (Int32.Parse(dxfVersion.Substring(2)) > 1027)
+                    if (Int32.Parse(hostDoc.DXFVersion.Substring(2)) > 1027)
                     {
                         // dxf version above 2013 (2018+)
                         var item_embeddedObj = xDXFHelperMethods.SubItems(attr, "101", "Embedded Object");
@@ -249,12 +288,9 @@ namespace xDXF
 
                             var attrValueFull = String.Join("", attrValue);
 
-                            AttributeValues.Add(item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value, attrValueFull);
-
-                            //AttributeValues.Add(
-                            //    item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
-                            //    item_embeddedObj[0].FirstOrDefault(c => c.Code.Trim() == "3"));
-
+                            AttributeValues.Add(
+                                item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
+                                attrValueFull);
 
                         }
                         else
@@ -268,30 +304,34 @@ namespace xDXF
                     else
                     {
                         // dxf version up to 2013
-                        AttributeValues.Add(
-                                item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value,
-                                item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1").Value);
+
+                        var attrTAG = item_AcDbAttribute[0].FirstOrDefault(c => c.Code.Trim() == "2").Value;
+                        var attrVALUE = item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1").Value;
+
+                        var MLAttributePattern = Regex.Match(attrTAG, @"[A-Za-z]*_\d\d\d");
+                        if (MLAttributePattern.Success)
+                        {
+                            attrTAG = Regex.Replace(attrTAG, @"_\d\d\d$", "");
+                            if (AttributeValues.ContainsKey(attrTAG)) continue;
+
+                            var allLinkedAttributes = (from A in AttrtbutesInInsert
+                                                       where Regex.Match(
+                                                           A.FirstOrDefault(c => c.Code.Trim() == "2").Value,
+                                                           attrTAG + @"_\d\d\d").Success
+                                                       select A.FirstOrDefault(c => c.Code.Trim() == "1").Value);
+
+                            attrVALUE = String.Join(@"\P", allLinkedAttributes);
+                        }
+
+                        AttributeValues.Add(attrTAG, attrVALUE);
                     }
-
                 }
-
-
             }
 
+            AttributeValues = AttributeValues.ToDictionary(k => k.Key, v => v.Value.Replace("\\P", System.Environment.NewLine));
+
             return AttributeValues;
-
-
         }
-
-        #region Constructor stuff and privates
-
-        public xInsert()
-        {
-            _a = new Dictionary<string, string>();
-        }
-
-        public Dictionary<string, string> _a;
-        public string _tn;
 
         private Vector3 scale;
         private Vector3 postion;

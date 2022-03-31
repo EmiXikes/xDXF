@@ -2,10 +2,7 @@
 
 
 namespace xDXF
-{
-    #region Strcture Items
-
-
+{   
     public class Entity : EntityClass
     {
         public string Color
@@ -71,8 +68,6 @@ namespace xDXF
             }
         }
 
-
-
         public string Layer
         {
             get
@@ -87,10 +82,6 @@ namespace xDXF
             }
         }
     }
-    #endregion
-
-
-
 }
 
 

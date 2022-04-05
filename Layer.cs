@@ -78,7 +78,20 @@ namespace xDXF
 
                 int res = int.Parse(LayFlags.Value);
 
-                res |= 1;
+                if ((res & 1) == 1)
+                { // initial value true
+                    if (!value)
+                    {
+                        res &= 1;
+                    }
+                } else
+                { // initial value false
+                    if (value)
+                    {
+                        res |= 1;
+                    }
+                }
+
 
                 LayFlags.Value = res.ToString();
 
@@ -104,7 +117,20 @@ namespace xDXF
 
                 int res = int.Parse(LayFlags.Value);
 
-                res |= 4;
+                if ((res & 4) == 4)
+                { // initial value true
+                    if (!value)
+                    {
+                        res &= 4;
+                    }
+                }
+                else
+                { // initial value false
+                    if (value)
+                    {
+                        res |= 4;
+                    }
+                }
 
                 LayFlags.Value = res.ToString();
             }

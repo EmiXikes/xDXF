@@ -82,7 +82,7 @@ namespace xDXF
                 { // initial value true
                     if (!value)
                     {
-                        res &= 1;
+                        res &= ~1;
                     }
                 } else
                 { // initial value false
@@ -121,7 +121,7 @@ namespace xDXF
                 { // initial value true
                     if (!value)
                     {
-                        res &= 4;
+                        res &= ~4;
                     }
                 }
                 else

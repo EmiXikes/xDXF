@@ -46,6 +46,7 @@ namespace xDXF
         {
             var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
             AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR).Value = value;
+            // TODO must fix case if previous color was ByLayer. 62 tag is not present.
 
             // in case, if previous color was rgb
             var rgbColValPair = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);

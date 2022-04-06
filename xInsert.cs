@@ -77,9 +77,18 @@ namespace xDXF
 
                 if (scValPair != null)
                 {
-                    scale.X = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41").Value,dSep));
-                    scale.Y = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "42").Value,dSep));
-                    scale.Z = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43").Value,dSep));
+                    var scVP = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41");
+                    scale.X = scVP != null ? float.Parse(RX.Replace(scVP.Value, dSep)) : 1;
+
+                    scVP = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "42");
+                    scale.Y = scVP != null ? float.Parse(RX.Replace(scVP.Value, dSep)) : 1;
+
+                    scVP = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43");
+                    scale.Z = scVP != null ? float.Parse(RX.Replace(scVP.Value, dSep)) : 1;
+
+                    //scale.X = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41").Value,dSep));
+                    //scale.Y = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "42").Value,dSep));
+                    //scale.Z = float.Parse(RX.Replace(AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43").Value,dSep));
                 }
                 else
                 {
@@ -96,8 +105,15 @@ namespace xDXF
                 if (scValPair != null)
                 {
                     AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41").Value = value.X.ToString().Replace(",", ".");
-                    AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "42").Value = value.Y.ToString().Replace(",", ".");
-                    AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43").Value = value.Z.ToString().Replace(",", ".");
+
+                    var scVP = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "42");
+                    if (scVP != null) { scVP.Value = value.Y.ToString().Replace(",", "."); }
+
+                    scVP = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43");
+                    if (scVP != null) { scVP.Value = value.Y.ToString().Replace(",", "."); }
+
+                    //AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "42").Value = value.Y.ToString().Replace(",", ".");
+                    //AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "43").Value = value.Z.ToString().Replace(",", ".");
                 }
 
                 //  scale = value;
@@ -184,7 +200,7 @@ namespace xDXF
             var insertHardOwner = Data.FirstOrDefault(c => c.Code.Trim() == "360");
             var insertName = Data.FirstOrDefault(c => c.Code.Trim() == code.NAME).Value;
 
-            if (insertHardOwner == null)
+            if (insertHardOwner == null || !insertName.StartsWith("*"))
             {
                 return insertName;
             }

@@ -83,6 +83,8 @@ namespace xDXF
                 valPairIndex++;
             }
 
+            DXFVersion = SubItems(SubItems(DataValPairs, "0", "SECTION")[0],"9", "$ACADVER")[0][1].Value;
+
             BlockRecords = SubItems(DataValPairs, "0", "BLOCK_RECORD");
         }
 
@@ -121,16 +123,8 @@ namespace xDXF
 
         public List<List<ValPair>> BlockRecords;
 
-        public string DXFVersion
-        {
-            get
-            {
-                var dxfVersion = SubItems(
-                    SubItems(DataValPairs, "0", "SECTION")[0],
-                    "9", "$ACADVER")[0][1].Value;
-                return dxfVersion;
-            }
-        }
+        public string DXFVersion;
+
 
         public Dictionary<string, xInsert> Inserts
         {

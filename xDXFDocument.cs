@@ -86,6 +86,9 @@ namespace xDXF
             DXFVersion = SubItems(SubItems(DataValPairs, "0", "SECTION")[0],"9", "$ACADVER")[0][1].Value;
 
             BlockRecords = SubItems(DataValPairs, "0", "BLOCK_RECORD");
+
+            Inserts = GetInserts();
+            Layers = GetLayers();
         }
 
         #endregion
@@ -121,18 +124,11 @@ namespace xDXF
 
         #endregion
 
-        public List<List<ValPair>> BlockRecords;
-
         public string DXFVersion;
+        public List<List<ValPair>> BlockRecords;
+        public Dictionary<string, xInsert> Inserts;
+        public Dictionary<string, Layer> Layers;
 
-
-        public Dictionary<string, xInsert> Inserts
-        {
-            get
-            {
-                return GetInserts();
-            }
-        }
         public Dictionary<string, ValPair> HeaderVariables
         {
             get
@@ -147,17 +143,8 @@ namespace xDXF
                 return GetLayouts();
             }
         }
-        public Dictionary<string, Layer> Layers
-        {
-            get
-            {
-                return GetLayers();
-            }
-            //set
-            //{
-            //    layers = value;
-            //}
-        }
+
+
 
 
 

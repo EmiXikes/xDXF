@@ -72,7 +72,7 @@ namespace xDXF
         {
             get
             {
-                var AcDbBlockReference = SubItems("100", "AcDbBlockReference", new[] {"0","100"} )[0];
+                var AcDbBlockReference = SubItems("100", "AcDbBlockReference", new[] { "0", "100" })[0];
                 var scValPair = AcDbBlockReference.FirstOrDefault(C => C.Code.Trim() == "41");
 
                 if (scValPair != null)
@@ -156,7 +156,7 @@ namespace xDXF
                         Data.Remove(rotValpair);
                         rotValpair.flags |= vpFlag.DELETE;
                     }
-                    else 
+                    else
                     {
                         rotValpair.Value = value.ToString();
                     }
@@ -175,21 +175,57 @@ namespace xDXF
         /// <para> Attribute values. Only single-line attributes can be set. </para>
         /// <para> Multiline attributes can be read, but will not be set. </para>
         /// </summary>
-        public Dictionary<string, string> AttributeValues
+        public Dictionary<string, AttributeData> Attributes
         {
             get
             {
-                return GetAttributeValues();
+                tempAtrs = GetAttributeValues();
+
+                foreach (var item in tempAtrs)
+                {
+                    item.Value.UpdAttributes += new EventHandler<EventArgs>(UpdateAttributes);
+                }
+                return tempAtrs;
             }
-            set
-            {
-                SetAttributeValues(value);
-            }
+        }
+
+        Dictionary<string, AttributeData> tempAtrs;
+
+        private void UpdateAttributes(object sender, EventArgs e)
+        {
+            Console.WriteLine("Updating Attributes");
+            SetAttributeValues(tempAtrs);
+            //throw new NotImplementedException();
         }
 
         public bool IsXref { get; set; }
         public string XrefPath { get; set; }
         public bool XrefResolved { get; set; }
+
+        public class AttributeData
+        {
+            public event EventHandler<EventArgs> UpdAttributes;
+
+            private string _textValue;
+
+            //TODO later add some other attribute properties, e.g. color, ect
+
+            public string TextValue { get { return _textValue; } 
+                set 
+                {
+                    _textValue = value;
+
+                    EventHandler<EventArgs> handler = UpdAttributes;
+                    if (handler != null)
+                    {
+                        UpdAttributes(this, EventArgs.Empty);
+                    }
+                    
+                } 
+            }
+
+        }
+
 
         #region privates
         private string dSep = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
@@ -216,7 +252,7 @@ namespace xDXF
             }
             throw new NotImplementedException();
         }
-        private void SetAttributeValues(Dictionary<string, string> value)
+        private void SetAttributeValues(Dictionary<string, AttributeData> value)
         {
             List<List<ValPair>> AttributesInInsert = SubItems("0", "ATTRIB");
 
@@ -243,7 +279,7 @@ namespace xDXF
                     else
                     {
                         // SingleLine attributes
-                        item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1").Value = newAttr.Value;
+                        item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1").Value = newAttr.Value.TextValue;
                     }
                 }
                 else
@@ -264,7 +300,7 @@ namespace xDXF
                         // SingleLine attributes
                         var item_AcDbAttribute = xDXFHelperMethods.SubItems(insAttr[0], "100", "AcDbAttribute");
                         var item_AcDbText = xDXFHelperMethods.SubItems(insAttr[0], "100", "AcDbText");
-                        item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1").Value = newAttr.Value;
+                        item_AcDbText[0].FirstOrDefault(c => c.Code.Trim() == "1").Value = newAttr.Value.TextValue;
                     }
 
 
@@ -274,7 +310,7 @@ namespace xDXF
 
         }
 
-        private Dictionary<string, string> GetAttributeValues()
+        private Dictionary<string, AttributeData> GetAttributeValues()
         {
             var AttrtbutesInInsert = SubItems("0", "ATTRIB");
 
@@ -346,12 +382,17 @@ namespace xDXF
 
             AttributeValues = AttributeValues.ToDictionary(k => k.Key, v => v.Value.Replace("\\P", System.Environment.NewLine));
 
-            return AttributeValues;
+            return AttributeValues.ToDictionary(k=>k.Key,
+                v=>new AttributeData() 
+                {
+                    TextValue = v.Value
+                }  );
         }
 
         private Vector3 scale;
         private Vector3 postion;
         private float rotation;
+        private string attributeValue;
         #endregion
 
     }

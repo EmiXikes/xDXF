@@ -45,8 +45,29 @@ namespace xDXF
         public void SetEntityColorIndexed(string value)
         {
             var AcDbEntity = SubItems(code.SUBCLASSHEADER, "AcDbEntity")[0];
+            var col = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR);
+            var lyr = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.LAYER);
+
+            //if new color is bylayer
+            if (value.ToUpper().Trim() == "BYLAYER")
+            {
+                if (col != null)
+                {
+                    Data.Remove(col);
+                    col.flags |= vpFlag.DELETE;
+                    return;
+                }
+                return;
+            }
+
+            //if previous color was ByLayer
+            if (col == null)
+            {
+                lyr.insertAfterMe = new List<ValPair>() { new ValPair { Code = "62", Value = value} };
+                return;
+            }
+
             AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLOR).Value = value;
-            // TODO must fix case if previous color was ByLayer. 62 tag is not present.
 
             // in case, if previous color was rgb
             var rgbColValPair = AcDbEntity.FirstOrDefault(C => C.Code.Trim() == code.COLORRGB);
